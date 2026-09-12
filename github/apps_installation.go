@@ -3,7 +3,6 @@ package github
 import (
 	"context"
 	"fmt"
-	"regexp"
 )
 
 // AppsService provides access to installation and App-related functions in the GitHub API.
@@ -13,10 +12,10 @@ type AppsService struct {
 
 // InstallationPermissions specifies the permissions granted to the installation token.
 type InstallationPermissions struct {
-	Issues        *string `json:"issues,omitempty"`
-	Contents      *string `json:"contents,omitempty"`
-	PullRequests  *string `json:"pull_requests,omitempty"`
-	Metadata      *string `json:"metadata,omitempty"`
+	Issues         *string `json:"issues,omitempty"`
+	Contents       *string `json:"contents,omitempty"`
+	PullRequests   *string `json:"pull_requests,omitempty"`
+	Metadata       *string `json:"metadata,omitempty"`
 	Administration *string `json:"administration,omitempty"`
 }
 
@@ -48,22 +47,6 @@ type InstallationTokenOptions struct {
 	Permissions   *InstallationPermissions `json:"permissions,omitempty"`
 }
 
-// installationTokenRegex matches both legacy fixed-length and new variable-length stateless tokens.
-// Stateless tokens start with `ghs_` and contain URL-safe base64 characters (including `-`, `_`, and `.`).
-var installationTokenRegex = regexp.MustCompile(`^ghs_[A-Za-z0-9_.-]+$`)
-
-// ValidateInstallationToken checks if the given token string conforms to valid GitHub App installation token format.
-// It supports both legacy stateful tokens (e.g. ghs_36chars) and modern variable-length stateless tokens.
-func ValidateInstallationToken(token string) error {
-	if token == "" {
-		return fmt.Errorf("installation token cannot be empty")
-	}
-	if !installationTokenRegex.MatchString(token) {
-		return fmt.Errorf("invalid installation token format: token must start with 'ghs_' and contain only URL-safe characters")
-	}
-	return nil
-}
-
 // CreateInstallationToken creates an installation token for the specified installation.
 func (s *AppsService) CreateInstallationToken(ctx context.Context, installationID int64, opts *InstallationTokenOptions) (*InstallationToken, *Response, error) {
 	u := fmt.Sprintf("app/installations/%v/access_tokens", installationID)
@@ -76,12 +59,6 @@ func (s *AppsService) CreateInstallationToken(ctx context.Context, installationI
 	resp, err := s.client.Do(ctx, req, token)
 	if err != nil {
 		return nil, resp, err
-	}
-
-	if token.Token != nil {
-		if err := ValidateInstallationToken(*token.Token); err != nil {
-			return nil, resp, fmt.Errorf("received invalid installation token: %w", err)
-		}
 	}
 
 	return token, resp, nil
