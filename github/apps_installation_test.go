@@ -43,8 +43,13 @@ func TestValidateInstallationToken(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "invalid characters",
+			name:    "stateless token with future-compatible characters",
 			token:   "ghs_invalid!@#$%^&*()",
+			wantErr: false,
+		},
+		{
+			name:    "prefix without token value",
+			token:   "ghs_",
 			wantErr: true,
 		},
 	}
@@ -115,7 +120,7 @@ func TestTokenTransport_StatelessTokenAuthorizationHeader(t *testing.T) {
 		authHeader := r.Header.Get("Authorization")
 		expectedAuth := "Bearer " + statelessToken
 		if authHeader != expectedAuth {
-		http.Error(w, fmt.Sprintf("expected auth %s, got %s", expectedAuth, authHeader), http.StatusUnauthorized)
+			http.Error(w, fmt.Sprintf("expected auth %s, got %s", expectedAuth, authHeader), http.StatusUnauthorized)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -145,6 +150,44 @@ func TestTokenTransport_StatelessTokenAuthorizationHeader(t *testing.T) {
 	if user["login"] != "octocat" {
 		t.Errorf("Expected login 'octocat', got %v", user["login"])
 	}
+}
+
+func TestTokenTransport_RecognizedTokenAuthorizationHeaders(t *testing.T) {
+	tests := []struct {
+		name  string
+		token string
+	}{
+		{name: "legacy installation token", token: "ghs_16C7e42F292c6912E7710c838347Ae178B4a"},
+		{name: "user-to-server token", token: "ghu_16C7e42F292c6912E7710c838347Ae178B4a"},
+		{name: "OAuth token", token: "gho_16C7e42F292c6912E7710c838347Ae178B4a"},
+		{name: "fine-grained PAT", token: "github_pat_16C7e42F292c6912E7710c838347Ae178B4a"},
+		{name: "legacy PAT", token: "ghp_16C7e42F292c6912E7710c838347Ae178B4a"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := &TokenTransport{
+				Token: tt.token,
+				Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+					if got, want := req.Header.Get("Authorization"), "Bearer "+tt.token; got != want {
+						t.Errorf("Authorization = %q, want %q", got, want)
+					}
+					return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, nil
+				}),
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "https://api.github.com/user", nil)
+			if _, err := transport.RoundTrip(req); err != nil {
+				t.Fatalf("RoundTrip returned error: %v", err)
+			}
+		})
+	}
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }
 
 func TestInstallationToken_JSONUnmarshal(t *testing.T) {

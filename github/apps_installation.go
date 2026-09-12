@@ -3,7 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
-	"regexp"
+	"strings"
 )
 
 // AppsService provides access to installation and App-related functions in the GitHub API.
@@ -13,10 +13,10 @@ type AppsService struct {
 
 // InstallationPermissions specifies the permissions granted to the installation token.
 type InstallationPermissions struct {
-	Issues        *string `json:"issues,omitempty"`
-	Contents      *string `json:"contents,omitempty"`
-	PullRequests  *string `json:"pull_requests,omitempty"`
-	Metadata      *string `json:"metadata,omitempty"`
+	Issues         *string `json:"issues,omitempty"`
+	Contents       *string `json:"contents,omitempty"`
+	PullRequests   *string `json:"pull_requests,omitempty"`
+	Metadata       *string `json:"metadata,omitempty"`
 	Administration *string `json:"administration,omitempty"`
 }
 
@@ -48,18 +48,13 @@ type InstallationTokenOptions struct {
 	Permissions   *InstallationPermissions `json:"permissions,omitempty"`
 }
 
-// installationTokenRegex matches both legacy fixed-length and new variable-length stateless tokens.
-// Stateless tokens start with `ghs_` and contain URL-safe base64 characters (including `-`, `_`, and `.`).
-var installationTokenRegex = regexp.MustCompile(`^ghs_[A-Za-z0-9_.-]+$`)
-
 // ValidateInstallationToken checks if the given token string conforms to valid GitHub App installation token format.
-// It supports both legacy stateful tokens (e.g. ghs_36chars) and modern variable-length stateless tokens.
+// It supports both legacy stateful tokens and variable-length stateless tokens.
+// The token payload is intentionally not validated so future GitHub token schemas
+// can be accepted without a client update.
 func ValidateInstallationToken(token string) error {
-	if token == "" {
-		return fmt.Errorf("installation token cannot be empty")
-	}
-	if !installationTokenRegex.MatchString(token) {
-		return fmt.Errorf("invalid installation token format: token must start with 'ghs_' and contain only URL-safe characters")
+	if !strings.HasPrefix(token, "ghs_") || len(token) == len("ghs_") {
+		return fmt.Errorf("invalid installation token format: token must start with 'ghs_' and not be empty")
 	}
 	return nil
 }
