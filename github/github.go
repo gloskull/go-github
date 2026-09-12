@@ -62,7 +62,7 @@ type TokenTransport struct {
 func (t *TokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req2 := req.Clone(req.Context())
 	if t.Token != "" {
-		if strings.HasPrefix(t.Token, "ghs_") || strings.HasPrefix(t.Token, "ghu_") || strings.HasPrefix(t.Token, "ghp_") || strings.HasPrefix(t.Token, "gho_") {
+		if isBearerToken(t.Token) {
 			req2.Header.Set("Authorization", "Bearer "+t.Token)
 		} else {
 			req2.Header.Set("Authorization", "token "+t.Token)
@@ -73,6 +73,15 @@ func (t *TokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		transport = http.DefaultTransport
 	}
 	return transport.RoundTrip(req2)
+}
+
+func isBearerToken(token string) bool {
+	return strings.HasPrefix(token, "ghs_") ||
+		strings.HasPrefix(token, "ghu_") ||
+		strings.HasPrefix(token, "ghp_") ||
+		strings.HasPrefix(token, "gho_") ||
+		strings.HasPrefix(token, "ghr_") ||
+		strings.HasPrefix(token, "github_pat_")
 }
 
 // Client returns an *http.Client configured with TokenTransport.
